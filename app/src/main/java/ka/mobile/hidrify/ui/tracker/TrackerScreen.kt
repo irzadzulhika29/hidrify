@@ -1,21 +1,34 @@
 package ka.mobile.hidrify.ui.tracker
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -26,6 +39,32 @@ fun TrackerScreen(
     viewModel: TrackerViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val listState = rememberLazyListState()
+    val context = LocalContext.current
+    var showAddDialog by rememberSaveable { mutableStateOf(false) }
+    var pendingAmount by rememberSaveable { mutableStateOf<Int?>(null) }
+    var selectedPhotoUri by rememberSaveable { mutableStateOf<String?>(null) }
+    val cameraUriState = remember { mutableStateOf<Uri?>(null) }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        selectedPhotoUri = uri?.toString()
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) {
+            selectedPhotoUri = cameraUriState.value?.toString()
+        }
+    }
+
+    LaunchedEffect(uiState.waterLogs.size) {
+        if (uiState.waterLogs.isNotEmpty()) {
+            listState.animateScrollToItem(0)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -41,6 +80,7 @@ fun TrackerScreen(
         }
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -80,7 +120,11 @@ fun TrackerScreen(
                     modifier = Modifier.height(120.dp)
                 ) {
                     items(drinkOptions.size) { index ->
-                        Button(onClick = { viewModel.addDrink(drinkOptions[index]) }) {
+                        Button(onClick = {
+                            pendingAmount = drinkOptions[index]
+                            selectedPhotoUri = null
+                            showAddDialog = true
+                        }) {
                             Text("+ ${drinkOptions[index]} ml")
                         }
                     }
@@ -129,6 +173,79 @@ fun TrackerScreen(
             }
         }
     }
+
+    if (showAddDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            title = { Text("Tambah Minum") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(text = "Jumlah: ${pendingAmount ?: 0} ml")
+
+                    selectedPhotoUri?.let { uri ->
+                        AsyncImage(
+                            model = uri,
+                            contentDescription = "Foto dokumentasi minum",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(180.dp)
+                                .clip(RoundedCornerShape(12.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    } ?: Text(
+                        text = "Belum ada foto",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                galleryLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            }
+                        ) {
+                            Text("Dari Galeri")
+                        }
+
+                        OutlinedButton(
+                            modifier = Modifier.weight(1f),
+                            onClick = {
+                                val uri = createImageUri(context)
+                                cameraUriState.value = uri
+                                uri?.let { cameraLauncher.launch(it) }
+                            }
+                        ) {
+                            Text("Buka Kamera")
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        pendingAmount?.let { amount ->
+                            viewModel.addDrink(amount, selectedPhotoUri)
+                        }
+                        showAddDialog = false
+                    },
+                    enabled = pendingAmount != null
+                ) {
+                    Text("Simpan")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDialog = false }) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -150,9 +267,20 @@ fun WaterLogCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            if (log.photoUri != null) {
+                AsyncImage(
+                    model = log.photoUri,
+                    contentDescription = "Foto dokumentasi minum",
+                    modifier = Modifier
+                        .size(60.dp)
+                        .clip(RoundedCornerShape(12.dp)),
+                    contentScale = ContentScale.Crop
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+            }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "${log.amount} ml",
@@ -172,5 +300,18 @@ fun WaterLogCard(
                 )
             }
         }
+    }
+}
+
+private fun createImageUri(context: android.content.Context): Uri? {
+    return try {
+        val image = File.createTempFile(
+            "hydrify_${System.currentTimeMillis()}",
+            ".jpg",
+            context.cacheDir
+        )
+        FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", image)
+    } catch (e: Exception) {
+        null
     }
 }

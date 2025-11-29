@@ -7,9 +7,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -49,8 +52,18 @@ fun HistoryDetailScreen(
             ) {
                 Spacer(modifier = Modifier.height(32.dp))
 
-                // Icon atau Ilustrasi
-                Icon(
+                // Foto dokumentasi atau ikon fallback
+                waterLog.photoUri?.let { uri ->
+                    AsyncImage(
+                        model = uri,
+                        contentDescription = "Foto dokumentasi minum",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .clip(MaterialTheme.shapes.large),
+                        contentScale = ContentScale.Crop
+                    )
+                } ?: Icon(
                     imageVector = Icons.Default.ArrowBack, // Ganti dengan icon air jika ada
                     contentDescription = null,
                     modifier = Modifier.size(80.dp),

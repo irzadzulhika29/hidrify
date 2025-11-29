@@ -46,12 +46,13 @@ class TrackerViewModel @Inject constructor(
         }
     }
 
-    fun addDrink(amount: Int) {
+    fun addDrink(amount: Int, photoUri: String? = null) {
         viewModelScope.launch {
             val log = WaterLog(
                 amount = amount,
                 timestamp = System.currentTimeMillis(),
-                date = LocalDate.now().toString()
+                date = LocalDate.now().toString(),
+                photoUri = photoUri
             )
             repository.insertLog(log)
         }

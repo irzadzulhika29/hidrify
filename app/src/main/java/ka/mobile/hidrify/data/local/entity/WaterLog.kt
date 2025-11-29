@@ -8,5 +8,6 @@ data class WaterLog(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val amount: Int,       // Jumlah air (ml)
     val timestamp: Long,   // Waktu input (milidetik)
-    val date: String       // Tanggal (format YYYY-MM-DD) untuk grouping
+    val date: String,      // Tanggal (format YYYY-MM-DD) untuk grouping
+    val photoUri: String? = null
 )

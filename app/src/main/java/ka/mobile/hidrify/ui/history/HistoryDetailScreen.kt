@@ -42,7 +42,7 @@ fun HistoryDetailScreen(
         }
     ) { padding ->
         log?.let { waterLog ->
-            Column(
+            Column( 
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
